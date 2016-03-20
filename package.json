@@ -1,0 +1,15 @@
+{
+  "name": "simple-gossip",
+  "version": "1.0.0",
+  "description": "gossip implement",
+  "main": "index.coffee",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "ran <abbshrsoufii@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "msgpack": "^1.0.2",
+    "msgpack-lite": "^0.1.17"
+  }
+}

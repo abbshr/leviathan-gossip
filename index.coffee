@@ -6,56 +6,24 @@ msgpack = require 'msgpack'
 class Gossip extends EventEmitter
 
   constructor: (args = {}) ->
-    @local = "127.0.0.1:#{port}"
-    {@port, @secval, @alive, @seeds} = args
-    @node = dgram.createSocket 'udp4'
-    @_initSocket @node
+    {@addr, @port, @secval, @alive, @seeds} = args
+    @local = "#{@addr}:#{@port}"
+    @peer = net.createServer @_initSocket
     @_init()
     super()
 
   _initSocket: (socket) ->
     socket
-    .on 'message', onMessage
     .on 'error', onError
     .on 'close', onClose
+    .on 'timeout', onTimeout
+    .on 'end', onEnd
+    ms = new msgpack.Stream socket
+    ms.on 'msg', onMsg
 
   _init: ->
-    if @local in @seeds
-      @on 'joining', (data) =>
-        {address: ip, port} = data.rinfo
-        console.log "[joining cluster - node:]", ip, port
-        @alive.push "#{ip}:#{port}"
-        info = Buffer JSON.stringify type: 'joined'
-        push ip, port, info
-
-    unless @local in @seeds
-      @on 'joined', (data) =>
-        clearTimeout @ref
-        {address: ip, port} = data.rinfo
-        console.log 'joined cluster'
-        @alive.push "#{ip}:#{port}"
-
-    @on 'pull-alive-nodes', (data) =>
-      {address: ip, port} = data.rinfo
-      console.warn 'pull request from', ip, port
-      # calcute the diff part
-      Object.assign @alive, data.alive
-      res = Buffer JSON.stringify type: 'push-alive-nodes', data: alive: @alive
-      @push ip, port, res
-
-    @on 'push-alive-nodes', (data) =>
-      {address: ip, port} = data.rinfo
-      console.warn 'pull from', ip, port
-      Object.assign @alive, data.alive
-      @emit "polling"
-
-  onMessage: (msg, rinfo) ->
-    event = JSON.parse msg.toString 'utf-8'
-    {type} = event
-    event.data.rinfo = rinfo
-    @emit type, event.data
-  onError: (err) -> console.error err
-  onClose: -> console.warn 'local socket closed'
+    # node discover
+    @join @seeds, info,
 
   onPolling: ->
     clearTimeout @_pollref
@@ -99,24 +67,32 @@ class Gossip extends EventEmitter
       @spread()
     , 20 * 1000
 
-  sync: (node) ->
-    dataSet = Buffer JSON.stringify type: 'pull-alive-nodes', data: alive: @alive
-    [ip, port] = node.split ':'
-    @pull ip, port, dataSet
-
-  pull: (ip, port, keys) ->
-    @node.send keys, port, ip
-
-  push: (ip, port, dataSet) ->
-    @node.send dataSet, port, ip
-
-  join: (seeds, stateInfo) ->
-    if seeds.length is 0
-      return no
-    [ip, port] = seeds[0].split ':'
-    @node.send stateInfo, port, ip
-    @ref = setTimeout =>
-      @join seeds[1..], stateInfo
-    , 10 * 1000
+  # push/pull model
+  polling: (peers, dataset) =>
+    # choose an alive peer
+    # choose an unreachable peer
+    # (choose a seed)
+    # create the connection
+    packet = []
+    [ip, port] = peer.split ':'
+    node = net.connect port, ip
+    ms = new msgpack.Stream node
+    ms.on 'msg', (msg) =>
+      # diff dataset
+      # parse the chunk
+      # yield the packet
+      # pull delta
+      @emit 'peers_update', @onPeersUpdate
+      @emit 'data_update', @onDataUpdate
+      # push delta
+      delta = msgpack.pack @peers, @ownedData
+      node.write delta
+    node.on 'connect', =>
+        # push digest
+        # dataset = Buffer @peers, @ownedData
+        dataset = msgpack.pack @peers, @ownedData
+        node.write dataset
+      .on 'error', @onError
+      .on 'timeout', @onTimeout
 
 module.exports = Gossip

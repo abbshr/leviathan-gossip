@@ -9,6 +9,7 @@
   "author": "ran <abbshrsoufii@gmail.com>",
   "license": "MIT",
   "dependencies": {
+    "async": "^2.0.0-rc.2",
     "msgpack": "^1.0.2",
     "msgpack-lite": "^0.1.17"
   }

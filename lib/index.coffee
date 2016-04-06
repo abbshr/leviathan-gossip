@@ -6,7 +6,7 @@ msgpack = require 'msgpack'
 async = require 'async'
 
 scuttlebutt = require './scuttlebutt'
-failureDetector = require './detect'
+FailureDetector = require './detect'
 util = require './util'
 State = require './state'
 
@@ -34,6 +34,7 @@ class Gossip extends EventEmitter
     @peers = {}
     @state = new State args.id, args.addr, args.port
     @scuttlebutt = new ScuttleButt @state, @peers
+    # @detector = new FailureDetector()
     super()
 
   run: ->
@@ -48,8 +49,10 @@ class Gossip extends EventEmitter
   initPeers: ->
     for peer_info in @seeds
       @alive.push peer_info
-      # TODO: re-design the peer structure
-      @peers[peer_info] = phi: 0, last_contact_ts: util.curr_ts()
+      @peers[peer_info] = new FailureDetector
+        phi: 0
+        last_contact_ts: util.curr_ts()
+      @peers[peer_info].isAlive = yes
 
   serve: ->
     net.createServer (socket) =>
@@ -85,7 +88,16 @@ class Gossip extends EventEmitter
 
   # TODO: use accural failure detector
   checkHealth: ->
-    # liveness.phi = detect liveness.last_contact_ts for {liveness} in @peers
+    for peer_info, peer of @peers
+      [source, target] = if peer.detect util.curr_ts()
+        peer.isAlive = yes
+        [@unreachable, @alive]
+      else
+        peer.isAlive = no
+        [@alive, @unreachable]
+
+      util.unorderList.rm source, peer_info
+      target.push peer_info unless peer_info in target
 
   schedule: (callback) ->
     queue = []
@@ -138,15 +150,16 @@ class Gossip extends EventEmitter
       # update known-peers list
       @scuttlebutt.updatePeers digest.peers
       ms.send @scuttlebutt.yieldPullDeltas digest
+
     @on '_deltas', (ms, {peers, version}, deltas, done) ->
       # update known-peers list
       @scuttlebutt.updatePeers peers
       # update new k-v in state
       @scuttlebutt.updateDeltas deltas
-      # TODO: failure detector works
 
       # send push deltas request
       ms.send @scuttlebutt.yieldPushDeltas deltas
+      # TODO: msgpack stream
       ms.end()
 
       setImmediate =>
@@ -158,8 +171,6 @@ class Gossip extends EventEmitter
     @on '_push_deltas', (ms, deltas, done) ->
       # update new k-v in state
       @scuttlebutt.updateDeltas deltas
-      # TODO: failure detector works
-
       done()
 
     # TODO: spread delete command

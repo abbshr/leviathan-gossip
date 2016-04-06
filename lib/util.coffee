@@ -18,3 +18,6 @@ exports.unorderList =
 
     last = lst.pop()
     lst[idx] = last unless idx is len - 1
+
+exports.means = (arr) ->
+  (arr.reduce (acc, e) -> acc + e) / arr.length

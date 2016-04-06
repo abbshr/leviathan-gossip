@@ -1,7 +1,6 @@
 {EventEmitter} = require 'events'
 
 level = require './persistent'
-failureDetector = require './detect'
 util = require './util'
 
 class State extends EventEmitter

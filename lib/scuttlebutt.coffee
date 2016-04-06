@@ -1,6 +1,6 @@
 {EventEmitter} = require 'events'
 
-failureDetector = require './detect'
+FailureDetector = require './detect'
 util = require './util'
 
 # TODO: remove peers opts, just for pure ScuttleButt
@@ -43,9 +43,10 @@ class ScuttleButt extends EventEmitter
 
   updatePeers: (peers) ->
     for peer_info in peers when peer_info not of @peers
-      @peers[peer_info] = phi: 0, last_contact_ts: util.curr_ts()
-    # emit at up level
+      @peers[peer_info] = new FailureDetector
+        phi: 0
+        last_contact_ts: util.curr_ts()
+      @peers[peer_info].isAlive = yes
 
   updateDeltas: (state) ->
     @state.set k, v, n for [k, v, n] in state
-    # emit at up level

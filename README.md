@@ -29,8 +29,8 @@ cfg =
 
 # 数据操作
 gossip.set k, v
-gossip.get k # → v
-gossip.getn # → all k-v pairs
+gossip.get k # → value
+gossip.getn # → version
 gossip.del k
 
 # 可以按照不同的设计思路设计k-v增量版本生成器, 默认采用从0开始递增的版本

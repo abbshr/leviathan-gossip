@@ -40,7 +40,7 @@ gossip.versionGenerator()
 
 ## 参考与引用
 
-+ [Efficient Reconciliation and Flow Control for Anti-Entropy Protocols](www.cs.cornell.edu/home/rvr/papers/flowgossip.pdf)
++ [Efficient Reconciliation and Flow Control for Anti-Entropy Protocols](http://www.cs.cornell.edu/home/rvr/papers/flowgossip.pdf)
 + [Cassandra: a decentralized structured storage system](http://www.cl.cam.ac.uk/~ey204/teaching/ACS/R212_2014_2015/papers/lakshman_ladis_2009.pdf)
 + [Serf internal](https://www.serfdom.io/docs/internals/gossip.html)
 + [Using Gossip Protocols For Failure Detection, Monitoring, Messaging And Other Good Things](http://highscalability.com/blog/2011/11/14/using-gossip-protocols-for-failure-detection-monitoring-mess.html)
@@ -48,4 +48,4 @@ gossip.versionGenerator()
 large-scale distributed systems](http://sbrc2010.inf.ufrgs.br/resources/presentations/tutorial/tutorial-montresor.pdf)
 + [A Scuttlebutt Demo](http://awinterman.github.io/simple-scuttle/)
 + [scuttlebutt-gossip-protocol](https://distributedalgorithm.wordpress.com/2014/05/15/scuttlebutt-gossip-protocol/)
-+ [The φ Accrual Failure Detector](www.jaist.ac.jp/~defago/files/pdf/IS_RR_2004_010.pdf)
++ [The φ Accrual Failure Detector](http://www.jaist.ac.jp/~defago/files/pdf/IS_RR_2004_010.pdf)

@@ -11,19 +11,25 @@ class ScuttleButt extends EventEmitter
     @peers = peers
 
   yieldDigest: ->
+    peers = {}
+    peers[peer_info] = __heartbeat for peer_info, {__heartbeat} of @peers
+
     type: 'pull_digest'
     digest:
       id: @state.id
-      peers: Object.keys @peers
+      peers: peers
       version: @state.max_version
 
   yieldPullDeltas: (digest) ->
     {id, peers, version} = digest
+    local_peers = {}
+    for peer_info, {__heartbeat} of @peers when peer_info not of peers
+      local_peers[peer_info] = __heartbeat
 
     type: 'pull_deltas'
     id: @state.id
     digest:
-      peers: peer_info for peer_info of @peers when peer_info not in peers
+      peers: local_peers
       version: @state.max_version
     state: @_yieldUpdate version
 
@@ -42,11 +48,16 @@ class ScuttleButt extends EventEmitter
       []
 
   updatePeers: (peers) ->
-    for peer_info in peers when peer_info not of @peers
-      @peers[peer_info] = new FailureDetector
-        phi: 0
-        last_contact_ts: util.curr_ts()
-      @peers[peer_info].isAlive = yes
+    for peer_info, __heartbeat of peers
+
+      if peer_info not of @peers
+        @peers[peer_info] = new FailureDetector last_contact_ts: util.curr_ts()
+        @peers[peer_info].isAlive = yes
+        @peers[peer_info].__heartbeat = __heartbeat
+
+      if __heartbeat > @peers[peer_info].__heartbeat
+        @peers[peer_info].__heartbeat = __heartbeat
+        @peers[peer_info].accural util.curr_ts()
 
   updateDeltas: (state) ->
-    @state.set k, v, n for [k, v, n] in state
+    @state.set k, v, n for [k, v, n] in state when n > @state.getn k

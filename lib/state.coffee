@@ -1,6 +1,5 @@
 {EventEmitter} = require 'events'
 
-level = require './persistent'
 util = require './util'
 
 class State extends EventEmitter
@@ -13,16 +12,26 @@ class State extends EventEmitter
 
   defaultVersion: -> 0
 
-  set: (k, v, n = @defaultVersion()) ->
-    @data[k] = [v, n]
-    @max_version = n if n > @max_version
+  set: (k, v) ->
+    @max_version += 1
+    @data[k] = [v, @max_version]
+
   get: (k) ->
     @data[k]
+
+  getv: (k) ->
+    @data[k]?[0]
+
+  getn: (k) ->
+    @date[k]?[1] ? @defaultVersion()
+
   geta: ->
     @data
+
   delh: (k) ->
     delete @data[k]
     util.unorderList.rm @_trash, k
+
   dels: (k) ->
     @data[k]?.needDelete = yes
     @_trash.push k unless k in @_trash

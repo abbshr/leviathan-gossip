@@ -3,7 +3,7 @@ util = require './util'
 class FailureDetector
 
   constructor: (info) ->
-    {@id, @phi, @last_contact_ts} = info
+    {@id, @last_contact_ts} = info
     @val = []
     @threshold = 8
     @val_max_len = 100
@@ -16,7 +16,6 @@ class FailureDetector
   detect: (curr_ts) ->
     val = curr_ts - last_contact_ts
     e = val / util.means @val
-    @phi = e / Math.log 10
-    @phi <= @threshold
+    e / Math.log 10 <= @threshold
 
 module.exports = FailureDetector

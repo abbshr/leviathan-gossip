@@ -34,7 +34,7 @@ class Gossip extends EventEmitter
     @peers = {}
     @state = new State args.id, args.addr, args.port
     @scuttlebutt = new ScuttleButt @state, @peers
-    # @detector = new FailureDetector()
+    @__heartbeat = 0
     super()
 
   run: ->
@@ -49,10 +49,9 @@ class Gossip extends EventEmitter
   initPeers: ->
     for peer_info in @seeds
       @alive.push peer_info
-      @peers[peer_info] = new FailureDetector
-        phi: 0
-        last_contact_ts: util.curr_ts()
+      @peers[peer_info] = new FailureDetector last_contact_ts: util.curr_ts()
       @peers[peer_info].isAlive = yes
+      @peers[peer_info].__heartbeat = 0
 
   serve: ->
     net.createServer (socket) =>
@@ -61,10 +60,10 @@ class Gossip extends EventEmitter
       ms.on 'msg', messageHandle
       # TODO: initialize server events handle configuration
 
-  heartbeat: (count = 1) ->
-    @state.set '__heartbeat', count
+  heartbeat: ->
+    @__heartbeat++
     setTimeout =>
-      @heartbeat count + 1
+      @heartbeat()
     , @heartbeat_val
 
   polling: =>
@@ -86,7 +85,6 @@ class Gossip extends EventEmitter
       @reduce()
     , @reduce_val
 
-  # TODO: use accural failure detector
   checkHealth: ->
     for peer_info, peer of @peers
       [source, target] = if peer.detect util.curr_ts()
@@ -156,14 +154,13 @@ class Gossip extends EventEmitter
       @scuttlebutt.updatePeers peers
       # update new k-v in state
       @scuttlebutt.updateDeltas deltas
-
       # send push deltas request
       ms.send @scuttlebutt.yieldPushDeltas deltas
       # TODO: msgpack stream
       ms.end()
 
       setImmediate =>
-        @emit 'new_peers', peers if peers.length
+        @emit 'new_peers', Object.keys peers if peers.length
         @emit 'updates', deltas if deltas.length
 
       done null
@@ -180,9 +177,9 @@ class Gossip extends EventEmitter
   set: (k, v) ->
     @state.set k, v, @versionGenerator @getn k
   get: (k) ->
-    (@state.get k)?[0]
+    @state.getv k
   getn: (k) ->
-    (@state.get k)?[1]
+    @state.getn k
   # TODO: spread delete command
   del: (k) ->
     @state.dels k

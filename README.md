@@ -5,6 +5,11 @@ Leviathan 内部组件之一, 用于构建 Leviathan 集群, 提供数据同步�
 
 借鉴了 Cassandra/Serf. 采用基于 pull/push 通信模型, scuttlebutt 传输策略的 gossip 协议变种实现(即无分散key, 每个节点采用全冗余设计).
 
+## TODO
+
++ 设计实现key同步删除
++ 细粒度模块化
+
 ## API (当前版本)
 
 ```coffee
@@ -15,6 +20,7 @@ gossip = new Gossip cfg
 gossip
   .on 'new_peers', (peers) ->
   .on 'updates', (deltas) ->
+  # .on 'delete', (key) ->
 
 # 节点配置
 cfg =

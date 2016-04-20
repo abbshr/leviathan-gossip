@@ -5,8 +5,8 @@ assert = require 'assert'
 msgpack = require 'msgpack'
 async = require 'async'
 
-scuttlebutt = require './scuttlebutt'
-FailureDetector = require './detect'
+Scuttlebutt = require './scuttlebutt'
+Peer = require './peer'
 util = require './util'
 State = require './state'
 
@@ -22,9 +22,7 @@ class Gossip extends EventEmitter
   # @@heartbeat_val:
   # @@health_check_val:
   # @@reduce_val:
-  constructor: (args) ->
-    {@seeds, @gossip_val, @health_check_val, @heartbeat_val, @reduce_val} = args
-
+  constructor: ({id, @seeds, @gossip_val, @health_check_val, @heartbeat_val, @reduce_val} = {}) ->
     assert.notEqual @seeds.length, 0
     assert.ok @gossip_val >= 1000
     assert.ok @health_check_val >= 1000
@@ -32,7 +30,7 @@ class Gossip extends EventEmitter
     @unreachable = []
     @alive = []
     @peers = {}
-    @state = new State args.id, args.addr, args.port
+    @state = new State id
     @scuttlebutt = new ScuttleButt @state, @peers
     @__heartbeat = 0
     super()
@@ -49,9 +47,7 @@ class Gossip extends EventEmitter
   initPeers: ->
     for peer_info in @seeds
       @alive.push peer_info
-      @peers[peer_info] = new FailureDetector last_contact_ts: util.curr_ts()
-      @peers[peer_info].isAlive = yes
-      @peers[peer_info].__heartbeat = 0
+      @peer[peer_info] = new Peer peer_info
 
   serve: ->
     net.createServer (socket) =>
@@ -61,7 +57,7 @@ class Gossip extends EventEmitter
       # TODO: initialize server events handle configuration
 
   heartbeat: ->
-    @__heartbeat++
+    @state.set "__heartbeat", ++@__heartbeat
     setTimeout =>
       @heartbeat()
     , @heartbeat_val
@@ -79,11 +75,11 @@ class Gossip extends EventEmitter
     , @health_check_val
 
   # TODO: reduce the deleted keys
-  reduce: ->
-    setTimeout =>
-      @state.delh k for k in @state._trash
-      @reduce()
-    , @reduce_val
+  # reduce: ->
+  #   setTimeout =>
+  #     @state.delh k for k in @state._trash
+  #     @reduce()
+  #   , @reduce_val
 
   checkHealth: ->
     for peer_info, peer of @peers
@@ -135,9 +131,9 @@ class Gossip extends EventEmitter
       when 'pull_digest'
         @emit '_digest', ms, msg.digest
       when 'pull_deltas'
-        @emit '_deltas', ms, msg.digest, msg.state, opt.callback
+        @emit '_deltas', ms, msg.deltas, msg.digest, opt.callback
       when 'push_deltas'
-        @emit '_push_deltas', ms, msg.state, opt.callback
+        @emit '_push_deltas', ms, msg.deltas, opt.callback
       when 'delete'
         @emit '_delete', ms, msg.key
       else
@@ -145,47 +141,57 @@ class Gossip extends EventEmitter
 
   initHandlers: ->
     @on '_digest', (ms, digest) ->
-      # update known-peers list
-      @scuttlebutt.updatePeers digest.peers
       ms.send @scuttlebutt.yieldPullDeltas digest
 
-    @on '_deltas', (ms, {peers, version}, deltas, done) ->
-      # update known-peers list
-      @scuttlebutt.updatePeers peers
+    @on '_deltas', (ms, deltas, digest, done) ->
+      delete digest[@state.id]
       # update new k-v in state
-      @scuttlebutt.updateDeltas deltas
+      new_peers = @scuttlebutt.updateDeltas deltas
       # send push deltas request
-      ms.send @scuttlebutt.yieldPushDeltas deltas
+      ms.send @scuttlebutt.yieldPushDeltas digest
       # TODO: msgpack stream
       ms.end()
 
       setImmediate =>
-        @emit 'new_peers', Object.keys peers if peers.length
+        @emit 'new_peers', new_peers if new_peers.length
         @emit 'updates', deltas if deltas.length
 
       done null
 
     @on '_push_deltas', (ms, deltas, done) ->
+      delete digest[@state.id]
       # update new k-v in state
-      @scuttlebutt.updateDeltas deltas
-      done()
+      new_peers = @scuttlebutt.updateDeltas deltas
+      
+      setImmediate =>
+        @emit 'new_peers', new_peers if new_peers.length
+        @emit 'updates', deltas if deltas.length
+      
+      done null
 
     # TODO: spread delete command
-    @on '_delete', (ms, key) ->
-      @state.dels key
+    # @on '_delete', (ms, key) ->
+    #   @state.dels key
 
   set: (k, v) ->
     @state.set k, v, @versionGenerator @getn k
-  get: (k) ->
-    @state.getv k
-  getn: (k) ->
-    @state.getn k
+    
+  get: (r, k) ->
+    state = if r is @state.id
+      @state
+    else
+      @peers[r].state
+    state.getv k
+    
+  getn: (r, k) ->
+    state = if r is @state.id
+      @state
+    else
+      @peers[r].state
+    state.getn k
+    
   # TODO: spread delete command
-  del: (k) ->
-    @state.dels k
-
-  # custom version-update strategy
-  versionGenerator: (curr_version) ->
-    curr_version + 1 if curr_version?
+  # del: (k) ->
+  #   @state.dels k
 
 module.exports = Gossip

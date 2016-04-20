@@ -3,7 +3,7 @@ Leviathan-gossip
 
 Leviathan 内部组件之一, 用于构建 Leviathan 集群, 提供数据同步与最终一致性保障.
 
-借鉴了 Cassandra/Serf. 采用基于 pull/push 通信模型, scuttlebutt 传输策略的 gossip 协议变种实现(即无分散key, 每个节点采用全冗余设计).
+借鉴了 Cassandra/Serf. 采用基于 pull/push 传输模型, scuttlebutt(scuttle-depth) 传输策略的 gossip(Anti-Entropy) 协议实现.
 
 ## TODO
 
@@ -46,6 +46,7 @@ gossip.versionGenerator()
 
 ## 参考与引用
 
++ [SWIM: Scalable Weakly-consistent Infection-style Process Group Membership](https://www.cs.cornell.edu/~asdas/research/dsn02-swim.pdf)
 + [Efficient Reconciliation and Flow Control for Anti-Entropy Protocols](http://www.cs.cornell.edu/home/rvr/papers/flowgossip.pdf)
 + [Cassandra: a decentralized structured storage system](http://www.cl.cam.ac.uk/~ey204/teaching/ACS/R212_2014_2015/papers/lakshman_ladis_2009.pdf)
 + [Serf internal](https://www.serfdom.io/docs/internals/gossip.html)

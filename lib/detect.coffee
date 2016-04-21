@@ -1,5 +1,6 @@
 # accural failure detector
-util = require './util'
+util = require 'archangel-util'
+
 class FailureDetector
 
   constructor: (info) ->

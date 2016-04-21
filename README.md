@@ -24,7 +24,7 @@ gossip
 
 # 节点配置
 cfg =
-  id: 'node#0001' # 节点id
+  alias: 'node#0001' # 节点注释
   seeds: ['192.168.1.3:2333', '10.0.169.2:2333'] # 种子节点
   addr: '192.168.110.1' # local
   port: 6666 # local
@@ -37,11 +37,10 @@ cfg =
 gossip.set k, v
 gossip.get k # → value
 gossip.getn # → version
-gossip.del k
+# gossip.del k
 
 # 可以按照不同的设计思路设计k-v增量版本生成器, 默认采用从0开始递增的版本
-# set操作使用versionGenerator函数产生增量版本
-gossip.versionGenerator()
+# 本地set操作自增产生增量版本
 ```
 
 ## 参考与引用

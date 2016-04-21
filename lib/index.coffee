@@ -2,35 +2,38 @@ net = require 'net'
 assert = require 'assert'
 {EventEmitter} = require 'events'
 
+util = require 'archangel-util'
 msgpack = require 'msgpack'
 async = require 'async'
 
 Scuttlebutt = require './scuttlebutt'
 Peer = require './peer'
-util = require './util'
 State = require './state'
 
+# coding note: 
+#   peer_info ≌ id ≌ "#{addr}:#{port}"
 class Gossip extends EventEmitter
 
   # parameters
 
-  # @@seeds:
-  # @@id:
-  # @@addr:
-  # @@port:
-  # @@gossip_val:
-  # @@heartbeat_val:
-  # @@health_check_val:
-  # @@reduce_val:
-  constructor: ({id, @seeds, @gossip_val, @health_check_val, @heartbeat_val, @reduce_val} = {}) ->
+  # @seeds:
+  # @id:
+  # @addr:
+  # @port:
+  # @gossip_val:
+  # @heartbeat_val:
+  # @health_check_val:
+  # @reduce_val:
+  constructor: ({@addr, @port, @alias, @seeds, @gossip_val, @health_check_val, @heartbeat_val, @reduce_val} = {}) ->
     assert.notEqual @seeds.length, 0
     assert.ok @gossip_val >= 1000
     assert.ok @health_check_val >= 1000
-
+    
+    @id = "#{addr}:#{port}"
     @unreachable = []
     @alive = []
     @peers = {}
-    @state = new State id
+    @state = new State @id
     @scuttlebutt = new ScuttleButt @state, @peers
     @__heartbeat = 0
     super()
@@ -50,11 +53,12 @@ class Gossip extends EventEmitter
       @peer[peer_info] = new Peer peer_info
 
   serve: ->
-    net.createServer (socket) =>
+    @server = net.createServer (socket) =>
       ms = new msgpack.Stream socket
       messageHandler = @onMsg.bind this, {ms}
       ms.on 'msg', messageHandle
       # TODO: initialize server events handle configuration
+    .listen @port
 
   heartbeat: ->
     @state.set "__heartbeat", ++@__heartbeat
@@ -174,7 +178,7 @@ class Gossip extends EventEmitter
     #   @state.dels key
 
   set: (k, v) ->
-    @state.set k, v, @versionGenerator @getn k
+    @state.set k, v
     
   get: (r, k) ->
     state = if r is @state.id

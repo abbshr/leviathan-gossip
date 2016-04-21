@@ -1,10 +1,10 @@
 {EventEmitter} = require 'events'
-util = require './util'
+util = require 'archangel-util'
 
 class State extends EventEmitter
 
   constructor: (info) ->
-    {@id, @addr, @port} = info
+    {@id} = info
     @data = {}
     # @_trash = []
     @max_version = @defaultVersion()

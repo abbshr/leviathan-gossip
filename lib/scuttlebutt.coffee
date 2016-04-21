@@ -1,10 +1,8 @@
 {EventEmitter} = require 'events'
-
+util = require 'archangel-util'
 Peer = require './peer'
 FailureDetector = require './detect'
-util = require './util'
 
-# TODO: remove peers opts, just for pure ScuttleButt
 class ScuttleButt extends EventEmitter
 
   constructor: (state, peers) ->
@@ -35,9 +33,7 @@ class ScuttleButt extends EventEmitter
     for peer_info, peer of @peers when peer_info not of digest
       deltas.push (@_yieldUpdate defaultVersion, @peers[id].state)...
 
-
     {type: 'pull_deltas', deltas, digest: new_digest}
-    
 
   yieldPushDeltas: (digest) ->
     deltas = []
@@ -49,7 +45,6 @@ class ScuttleButt extends EventEmitter
   _yieldUpdate: (version, state) ->
     ([state.id, k, v, n] for k, [v, n] of state.data when n > version)
     .sort ([..., n_a], [..., n_b]) -> n_a - n_b
-
 
   updateDeltas: (deltas) ->
     for [id, k, v, n] in deltas when n > @state.getn k

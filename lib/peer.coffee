@@ -1,5 +1,6 @@
 assert = require 'assert'
 util = require 'archangel-util'
+State = require './state'
 FailureDetector = require './detect'
 
 # parameters
@@ -7,9 +8,9 @@ FailureDetector = require './detect'
 #   required: id
 class Peer
 
-  constructor: ({id} = {}) ->
-    assert.ok id?
-    @state ?= new State id
+  constructor: ({@id, @state} = {}) ->
+    @state = new State {@id} unless @state?
+    
     @detector = new FailureDetector last_contact_ts: util.curr_ts()
     @isAlive = yes
     @__heartbeat = 0
@@ -19,3 +20,5 @@ class Peer
     
   accural: (ts) ->
     @detector.accural ts
+
+module.exports = Peer

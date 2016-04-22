@@ -13,7 +13,7 @@ class ScuttleButt extends EventEmitter
     {id: local_id, max_version: local_max_version} = @state
     
     digest = {}
-    for peer of @peers
+    for _, peer of @peers
       {id, max_version} = peer.state
       digest[id] = max_version
     digest[local_id] = local_max_version
@@ -21,21 +21,28 @@ class ScuttleButt extends EventEmitter
     {type: 'pull_digest', digest}
 
   yieldPullDeltas: (digest) ->
+    delete digest[@state.id]
+    
     new_digest = {}
     deltas = []
-    for id, version of digest
-      if @peers[id]?.state.version > version
-        deltas.push (@_yieldUpdate version, @peers[id].state)...
-      else if @peers[id]?.state.version isnt version
-        new_digest[id] = @peers[id].state.max_version
-    
     defaultVersion = @state.defaultVersion()
+    for id, version of digest
+      switch
+        when not @peers[id]?
+          new_digest[id] = defaultVersion
+        when @peers[id].state.version > version
+          deltas.push (@_yieldUpdate version, @peers[id].state)...
+        when @peers[id].state.version < version
+          new_digest[id] = @peers[id].state.max_version
+    
     for peer_info, peer of @peers when peer_info not of digest
       deltas.push (@_yieldUpdate defaultVersion, @peers[id].state)...
 
     {type: 'pull_deltas', deltas, digest: new_digest}
 
   yieldPushDeltas: (digest) ->
+    delete digest[@state.id]
+    
     deltas = []
     for id, version of digest
       deltas.push (@_yieldUpdate version, @peers[id].state)...
@@ -58,3 +65,5 @@ class ScuttleButt extends EventEmitter
         
       @peers[id].state.set k, v, n
       if existed then continue else id
+      
+module.exports = ScuttleButt

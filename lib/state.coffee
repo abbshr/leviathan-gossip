@@ -12,7 +12,7 @@ class State extends EventEmitter
   defaultVersion: -> 0
   
   set: (k, v, n) ->
-    @max_version = n ? max_version + 1
+    @max_version = n ? @max_version + 1
     @data[k] = [v, @max_version]
 
   get: (k) ->
@@ -22,7 +22,7 @@ class State extends EventEmitter
     @data[k]?[0]
 
   getn: (k) ->
-    @date[k]?[1] ? @defaultVersion()
+    @data[k]?[1] ? @defaultVersion()
 
   # geta: ->
   #   @data

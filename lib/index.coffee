@@ -3,7 +3,7 @@ assert = require 'assert'
 {EventEmitter} = require 'events'
 
 util = require 'archangel-util'
-msgpack = require 'msgpack'
+msgpack = require 'msgpack-lite'
 async = require 'async'
 
 Scuttlebutt = require './scuttlebutt'
@@ -33,7 +33,7 @@ class Gossip extends EventEmitter
     @unreachable = []
     @alive = []
     @peers = {}
-    @state = new State @id
+    @state = new State {@id}
     @scuttlebutt = new ScuttleButt @state, @peers
     @__heartbeat = 0
     super()
@@ -50,13 +50,19 @@ class Gossip extends EventEmitter
   initPeers: ->
     for peer_info in @seeds
       @alive.push peer_info
-      @peer[peer_info] = new Peer peer_info
+      @peer[peer_info] = new Peer {peer_info}
 
   serve: ->
     @server = net.createServer (socket) =>
-      ms = new msgpack.Stream socket
-      messageHandler = @onMsg.bind this, {ms}
-      ms.on 'msg', messageHandle
+      decodeStream = msgpack.createDecodeStream()
+      encodeStream = msgpack.createEncodeStream()
+      
+      encodeStream
+      .pipe socket
+      .pipe decodeStream
+      .on 'data', messageHandle
+      
+      messageHandle = @onMsg.bind this, {ms: encodeStream}
       # TODO: initialize server events handle configuration
     .listen @port
 
@@ -101,11 +107,11 @@ class Gossip extends EventEmitter
     queue = []
     # TODO: schedule with a probablity
     if @alive > 0
-      queue.push util.getRandomPeer @alive
+      queue.push util.getRandomItem @alive
       if queue[0] not in @seeds or @alive.length < @seeds.length
-        queue.push util.getRandomPeer @seeds
+        queue.push util.getRandomItem @seeds
     if @unreachable > 0
-      queue.push util.getRandomPeer @unreachable
+      queue.push util.getRandomItem @unreachable
 
     return if queue.length is 0
 
@@ -119,15 +125,22 @@ class Gossip extends EventEmitter
 
   gossip: (peer_addr, peer_port, callback) =>
     # TODO: client events handle configuration
-    peer = net.connect peer_addr, peer_port
-    ms = new msgpack.Stream peer
-
-    messageHandler = @onMsg.bind this, {ms, callback}
+    socket = net.connect peer_addr, peer_port
+    decodeStream = msgpack.createDecodeStream()
+    encodeStream = msgpack.createEncodeStream()
+    
+    encodeStream
+    .pipe socket
+    .pipe decodeStream
+    .on 'data', messageHandle
+      
+    messageHandle = @onMsg.bind this, {ms: encodeStream, callback}
 
     peer.on 'error', onError
-    ms.on 'msg', messageHandler
-
-    ms.send @scuttlebutt.yieldDigest()
+    # ms.on 'msg', messageHandle
+    
+    encodeStream.write @scuttlebutt.yieldDigest()
+    # ms.send @scuttlebutt.yieldDigest()
 
   onMsg = (opt, msg) =>
     {ms} = opt
@@ -144,16 +157,14 @@ class Gossip extends EventEmitter
         console.error 'unexpected pack'
 
   initHandlers: ->
-    @on '_digest', (ms, digest) ->
-      ms.send @scuttlebutt.yieldPullDeltas digest
+    @on '_digest', (ms, digest) ->      
+      ms.write @scuttlebutt.yieldPullDeltas digest
 
     @on '_deltas', (ms, deltas, digest, done) ->
-      delete digest[@state.id]
       # update new k-v in state
       new_peers = @scuttlebutt.updateDeltas deltas
       # send push deltas request
-      ms.send @scuttlebutt.yieldPushDeltas digest
-      # TODO: msgpack stream
+      ms.write @scuttlebutt.yieldPushDeltas digest
       ms.end()
 
       setImmediate =>
@@ -163,7 +174,6 @@ class Gossip extends EventEmitter
       done null
 
     @on '_push_deltas', (ms, deltas, done) ->
-      delete digest[@state.id]
       # update new k-v in state
       new_peers = @scuttlebutt.updateDeltas deltas
       

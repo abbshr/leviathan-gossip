@@ -54,9 +54,10 @@ class Gossip extends EventEmitter
     log "init seeds:", @seeds
 
   initPeers: ->
-    for id in @seeds
+    new_peers = for id in @seeds
       @alive.push id
       @peers[id] = new Peer {id}
+    @emit "new_peers", new_peers if new_peers.length
     log "init peers:", @peers
 
   serve: ->

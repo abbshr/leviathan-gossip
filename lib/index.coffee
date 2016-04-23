@@ -3,10 +3,11 @@ assert = require 'assert'
 {EventEmitter} = require 'events'
 
 util = require 'archangel-util'
+{log} = require 'util'
 msgpack = require 'msgpack-lite'
 async = require 'async'
 
-Scuttlebutt = require './scuttlebutt'
+ScuttleButt = require './scuttlebutt'
 Peer = require './peer'
 State = require './state'
 
@@ -29,7 +30,7 @@ class Gossip extends EventEmitter
     assert.ok @gossip_val >= 1000
     assert.ok @health_check_val >= 1000
     
-    @id = "#{addr}:#{port}"
+    @id = "#{@addr}:#{@port}"
     @unreachable = []
     @alive = []
     @peers = {}
@@ -39,18 +40,24 @@ class Gossip extends EventEmitter
     super()
 
   run: ->
+    @initSeeds()
     @initPeers()
     @initHandlers()
     @serve()
     @heartbeat()
-    @polling()
+    # @polling()
     @monitor()
-    @reduce()
+    # @reduce()
+    
+  initSeeds: ->
+    util.unorderList.rm @seeds, @id
+    log "init seeds:", @seeds
 
   initPeers: ->
-    for peer_info in @seeds
-      @alive.push peer_info
-      @peer[peer_info] = new Peer {peer_info}
+    for id in @seeds
+      @alive.push id
+      @peers[id] = new Peer {id}
+    log "init peers:", @peers
 
   serve: ->
     @server = net.createServer (socket) =>
@@ -64,9 +71,11 @@ class Gossip extends EventEmitter
       
       messageHandle = @onMsg.bind this, {ms: encodeStream}
       # TODO: initialize server events handle configuration
-    .listen @port
+    .listen @port, =>
+      log "server start:", @port
 
   heartbeat: ->
+    log "start heartbeat", @__heartbeat, @state.data
     @state.set "__heartbeat", ++@__heartbeat
     setTimeout =>
       @heartbeat()
@@ -75,10 +84,12 @@ class Gossip extends EventEmitter
   polling: =>
     # TODO: consider if there is need to wait the longest request
     setTimeout =>
+      log "start polling"
       @schedule @polling
     , @gossip_val
 
   monitor: ->
+    log "start monitor"
     setTimeout =>
       @checkHealth()
       @monitor()
@@ -92,6 +103,7 @@ class Gossip extends EventEmitter
   #   , @reduce_val
 
   checkHealth: ->
+    log "start health check"
     for peer_info, peer of @peers
       [source, target] = if peer.detect util.curr_ts()
         peer.isAlive = yes
@@ -102,18 +114,23 @@ class Gossip extends EventEmitter
 
       util.unorderList.rm source, peer_info
       target.push peer_info unless peer_info in target
+      console.info "\t", peer_info, "is alive:", peer.isAlive, "alive:", @alive, "suspent:", @unreachable
 
   schedule: (callback) ->
+    log "start schedule peers"
     queue = []
     # TODO: schedule with a probablity
     if @alive > 0
       queue.push util.getRandomItem @alive
-      if queue[0] not in @seeds or @alive.length < @seeds.length
-        queue.push util.getRandomItem @seeds
+      
     if @unreachable > 0
       queue.push util.getRandomItem @unreachable
-
-    return if queue.length is 0
+      
+    if @seeds.length > 0 and queue[0] not in @seeds or @alive.length < @seeds.length
+      queue.push util.getRandomItem @seeds
+    
+    log "peers to gossip with:", queue
+    return callback() if queue.length is 0
 
     queue = for peer_info in queue
       [addr, port] = peer_info.split ':'
@@ -139,6 +156,7 @@ class Gossip extends EventEmitter
     peer.on 'error', onError
     # ms.on 'msg', messageHandle
     
+    log "start gossip with", peer_addr, peer_info
     encodeStream.write @scuttlebutt.yieldDigest()
     # ms.send @scuttlebutt.yieldDigest()
 
@@ -194,15 +212,15 @@ class Gossip extends EventEmitter
     state = if r is @state.id
       @state
     else
-      @peers[r].state
-    state.getv k
+      @peers[r]?.state
+    state?.getv k
     
   getn: (r, k) ->
     state = if r is @state.id
       @state
     else
-      @peers[r].state
-    state.getn k
+      @peers[r]?.state
+    state?.getn k
     
   # TODO: spread delete command
   # del: (k) ->

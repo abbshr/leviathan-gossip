@@ -13,13 +13,16 @@ Leviathan 内部组件之一, 用于构建 Leviathan 集群, 提供数据同步�
 ## API (当前版本)
 
 ```coffee
-Gossip = require './'
+Gossip = require 'leviathan-gossip'
 gossip = new Gossip cfg
 
 # 事件
 gossip
   .on 'new_peers', (peers) ->
   .on 'updates', (deltas) ->
+    # 写入持久化存储
+    # persistent_storage.write deltas
+  
   # .on 'delete', (key) ->
 
 # 节点配置
@@ -34,13 +37,15 @@ cfg =
   reduce_val: 10 * 1000 # 空闲键回收周期
 
 # 数据操作
-gossip.set k, v
-gossip.get k # → value
-gossip.getn # → version
+gossip.set k, v # 写本地节点
+gossip.get r, k # → value
+gossip.getn r, k # → version
 # gossip.del k
 
-# 可以按照不同的设计思路设计k-v增量版本生成器, 默认采用从0开始递增的版本
-# 本地set操作自增产生增量版本
+###
+  可以按照不同的设计思路设计k-v增量版本生成器, 默认采用从0开始递增的版本
+  本地set操作自增产生增量版本
+###
 ```
 
 ## 参考与引用

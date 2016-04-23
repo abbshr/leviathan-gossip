@@ -20,9 +20,7 @@ class ScuttleButt extends EventEmitter
     
     {type: 'pull_digest', digest}
 
-  yieldPullDeltas: (digest) ->
-    delete digest[@state.id]
-    
+  yieldPullDeltas: (digest) ->    
     new_digest = {}
     deltas = []
     defaultVersion = @state.defaultVersion()
@@ -37,6 +35,8 @@ class ScuttleButt extends EventEmitter
     
     for peer_info, peer of @peers when peer_info not of digest
       deltas.push (@_yieldUpdate defaultVersion, @peers[id].state)...
+      
+    delete digest[@state.id]
 
     {type: 'pull_deltas', deltas, digest: new_digest}
 
@@ -45,7 +45,7 @@ class ScuttleButt extends EventEmitter
     
     deltas = []
     for id, version of digest
-      deltas.push (@_yieldUpdate version, @peers[id].state)...
+      deltas.push (@_yieldUpdate version, @peers[id]?.state ? @state)...
       
     {type: 'push_deltas', deltas}
 
@@ -59,7 +59,7 @@ class ScuttleButt extends EventEmitter
         existed = no 
         @peers[id] = new Peer {id}
       
-      if k is '__heartbeat' and v > @peers[id].__heartbeat
+      if k is '__heartbeat'
         @peers[id].__heartbeat = v
         @peers[id].accural util.curr_ts()
         

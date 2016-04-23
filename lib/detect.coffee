@@ -15,8 +15,12 @@ class FailureDetector
     @last_contact_ts = curr_ts
 
   detect: (curr_ts) ->
-    val = curr_ts - last_contact_ts
-    e = val / util.means @val
+    val = curr_ts - @last_contact_ts
+    means = if @val.length
+      util.means @val
+    else
+      Infinity
+    e = val / means
     e / Math.log 10 <= @threshold
 
 module.exports = FailureDetector

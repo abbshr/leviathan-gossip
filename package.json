@@ -1,5 +1,5 @@
 {
-  "name": "simple-gossip",
+  "name": "leviathan-gossip",
   "version": "1.0.0",
   "description": "gossip implement",
   "main": "index.coffee",

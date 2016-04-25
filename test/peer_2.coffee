@@ -10,3 +10,13 @@ cfg =
 
 gossip = new Gossip cfg
 gossip.run()
+
+gossip.set "k2", "v2"
+gossip.set "p2", "v2"
+
+gossip.on "new_peers", (peers) ->
+  console.log "found new peers:", peers
+gossip.on "updates", (deltas) ->
+  console.log "get updates:", deltas
+  console.log "peer_1:", gossip.peers["127.0.0.1:3000"]?.state
+  console.log "peer_3:", gossip.peers["127.0.0.1:3002"]?.state

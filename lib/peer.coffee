@@ -11,7 +11,7 @@ class Peer
   constructor: ({@id, @state} = {}) ->
     @state = new State {@id} unless @state?
     
-    @detector = new FailureDetector last_contact_ts: util.curr_ts()
+    @detector = new FailureDetector()
     @isActive = yes
     @__heartbeat = 0
 

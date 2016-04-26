@@ -10,6 +10,15 @@ Leviathan 内部组件之一, 用于构建 Leviathan 集群, 提供数据同步�
 + 设计实现key同步删除
 + 细粒度模块化
 
+## Examples
+
+https://github.com/abbshr/leviathan-gossip/tree/master/example
+
+```bash
+# 打开四个控制台启动四个节点, (其中1和4为种子节点), 观察输出变化
+coffee peer_${i}.coffee
+```
+
 ## API (当前版本)
 
 ```coffee
@@ -18,8 +27,14 @@ gossip = new Gossip cfg
 
 # 事件
 gossip
-  .on 'new_peers', (peers) ->
+  .on 'peers_discover', (peers) ->
+    # 发现新节点
+  .on 'peers_recover', (peers) ->
+    # 恢复健康状态的节点
+  .on 'peers_suspend', (peers) ->
+    # 进入可疑状态的节点
   .on 'updates', (deltas) ->
+    # 获取状态更新
     # 写入持久化存储
     # persistent_storage.write deltas
   
@@ -29,12 +44,12 @@ gossip
 cfg =
   alias: 'node#0001' # 节点注释
   seeds: ['192.168.1.3:2333', '10.0.169.2:2333'] # 种子节点
-  addr: '192.168.110.1' # local
-  port: 6666 # local
+  addr: '192.168.110.1' # 使用外部节点可达地址
+  port: 6666 # 服务端口
   gossip_val: 1000 # gossip 周期
   heartbeat_val: 1000 # 心跳计数周期
   health_check_val: 5 * 1000 # 节点健康检测周期
-  reduce_val: 10 * 1000 # 空闲键回收周期
+  # reduce_val: 10 * 1000 # 空闲键回收周期
 
 # 数据操作
 gossip.set k, v # 写本地节点

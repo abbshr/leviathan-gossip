@@ -14,11 +14,11 @@ gossip.run()
 gossip.set "k4", "v4"
 gossip.set "p4", "v4"
 
-gossip.on "new_peers", (peers) ->
+gossip.on "peers_discover", (peers) ->
   console.log "found new peers:", peers
+gossip.on "peers_recover", (peers) ->
+  console.log "peers become active:", peers
+gossip.on "peers_suspend", (peers) ->
+  console.log "peers become suspend:", peers
 gossip.on "updates", (deltas) ->
   console.log "get updates:", deltas
-  console.log "peer_1:", gossip.peers["127.0.0.1:3000"]?.state
-  console.log "peer_2:", gossip.peers["127.0.0.1:3001"]?.state
-  console.log "peer_3:", gossip.peers["127.0.0.1:3002"]?.state
-  

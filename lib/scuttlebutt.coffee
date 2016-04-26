@@ -1,7 +1,6 @@
 {EventEmitter} = require 'events'
 util = require 'archangel-util'
 Peer = require './peer'
-FailureDetector = require './detect'
 
 class ScuttleButt extends EventEmitter
 
@@ -13,17 +12,12 @@ class ScuttleButt extends EventEmitter
     {id: local_id, max_version: local_max_version} = @state
     
     digest = {}
-    for _, peer of @peers
-      {id, max_version} = peer.state
-      digest[id] = max_version
+    digest[id] = max_version for _, {state: {id, max_version}} of @peers
     digest[local_id] = local_max_version
-    
-    # console.log "gossiper yield Digest:", digest
     
     {type: 'pull_digest', digest}
 
   yieldPullDeltas: (digest) ->
-    # console.log "gossipee receive Digest:", digest 
     receipt = {}
     deltas = []
     defaultVersion = @state.defaultVersion()
@@ -42,21 +36,14 @@ class ScuttleButt extends EventEmitter
     delete digest[@state.id]
     for id, peer of @peers when id not of digest
       deltas.push (@_yieldUpdate defaultVersion, @peers[id].state)...
-    
-    # console.log "gossipee yield Deltas:", deltas
-    # console.log "gossipee yield New Digest:", receipt
 
     {type: 'pull_deltas', deltas, receipt}
 
   yieldPushDeltas: (receipt) ->
-    # console.log "gossiper receive Receipt:", receipt
-    # delete receipt[@state.id]
-    
     deltas = []
     for id, version of receipt
       deltas.push (@_yieldUpdate version, @peers[id]?.state ? @state)...
     
-    # console.log "gossiper yield Deltas:", deltas
     {type: 'push_deltas', deltas}
 
   _yieldUpdate: (version, state) ->

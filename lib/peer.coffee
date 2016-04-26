@@ -12,7 +12,7 @@ class Peer
     @state = new State {@id} unless @state?
     
     @detector = new FailureDetector last_contact_ts: util.curr_ts()
-    @isAlive = yes
+    @isActive = yes
     @__heartbeat = 0
 
   detect: (ts) ->

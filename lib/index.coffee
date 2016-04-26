@@ -31,8 +31,8 @@ class Gossip extends EventEmitter
     assert.ok @health_check_val >= 1000
     
     @id = "#{@addr}:#{@port}"
-    @unreachable = []
-    @alive = []
+    @suspend = []
+    @active = []
     @peers = {}
     @state = new State {@id}
     @scuttlebutt = new ScuttleButt @state, @peers
@@ -55,30 +55,30 @@ class Gossip extends EventEmitter
 
   initPeers: ->
     new_peers = for id in @seeds
-      @alive.push id
       @peers[id] = new Peer {id}
       id
-
-    setImmediate =>
-      @emit "new_peers", new_peers if new_peers.length
     
-    log "init peers:", @peers
+    setImmediate =>
+      @emit "peers_discover", new_peers if new_peers.length
+      
+    @active.push new_peers...
+    
+    log "found #{new_peers.length} active peers"
 
   serve: ->
     @server = net.createServer (socket) =>
       decodeStream = msgpack.createDecodeStream()
       encodeStream = msgpack.createEncodeStream()
       
-      messageHandle = @onMsg.bind this, {ms: encodeStream}
+      onData = @_onData.bind this, {ms: encodeStream}
       
       encodeStream
       .pipe socket
       .pipe decodeStream
-      .on 'data', messageHandle
+      .on 'data', onData
       
       socket.on 'error', (e) -> log e
         
-      # TODO: initialize server events handle configuration
     .listen @port, =>
       log "server start:", @port
 
@@ -112,44 +112,43 @@ class Gossip extends EventEmitter
 
   checkHealth: ->
     # log "start health check"
-    unhealth = []
-    alive = []
-    for peer_info, peer of @peers
+    _suspend = []
+    _recover = []
+    for id, peer of @peers
       [source, target] = if peer.detect util.curr_ts()
-        alive.push peer_info unless peer.isAlive
-        peer.isAlive = yes
-        [@unreachable, @alive]
+        _recover.push id unless peer.isActive
+        peer.isActive = yes
+        [@suspend, @active]
       else
-        unhealth.push peer_info if peer.isAlive
-        peer.isAlive = no
-        [@alive, @unreachable]
+        _suspend.push id if peer.isActive
+        peer.isActive = no
+        [@active, @suspend]
 
-      util.unorderList.rm source, peer_info
-      target.push peer_info unless peer_info in target
-      console.info "\t", peer_info, "is alive:", peer.isAlive, "alive:", @alive, "suspent:", @unreachable
+      util.unorderList.rm source, id
+      target.push id unless id in target
     
-    @emit 'new_alive_peers', alive if alive.length
-    @emit 'new_suspect_peers', unhealth if unhealth.length
+    setImmediate =>
+      @emit 'peers_recover', _recover if _recover.length
+      @emit 'peers_suspend', _suspend if _suspend.length
 
   schedule: (callback) ->
     # log "start schedule peers"
-    # console.log @peers
     queue = []
     # TODO: schedule with a probablity
-    if @alive.length > 0
-      queue.push util.getRandomItem @alive
+    if @active.length > 0
+      queue.push util.getRandomItem @active
       
-    if @unreachable.length > 0
-      queue.push util.getRandomItem @unreachable
+    if @suspend.length > 0
+      queue.push util.getRandomItem @suspend
       
-    if (queue[0] not in @seeds and @seeds.length > 0) or @alive.length < @seeds.length
+    if (queue[0] not in @seeds and @seeds.length > 0) or @active.length < @seeds.length
       queue.push util.getRandomItem @seeds
     
     # log "peers to gossip with:", queue
     return callback() if queue.length is 0
 
-    queue = for peer_info in queue
-      [addr, port] = peer_info.split ':'
+    queue = for id in queue
+      [addr, port] = id.split ':'
       (cb) => @gossip addr, port, cb
 
     # TODO: consider if there is need to wait the longest request
@@ -159,61 +158,71 @@ class Gossip extends EventEmitter
   gossip: (peer_addr, peer_port, callback) =>
     # TODO: client events handle configuration
     socket = net.connect peer_port, peer_addr
-    .on 'error', (e) => 
-      log e.message
-      callback null
-    .on 'connect', =>
-      decodeStream = msgpack.createDecodeStream()
-      encodeStream = msgpack.createEncodeStream()
-      messageHandle = @onMsg.bind this, {ms: encodeStream, callback}
-      encodeStream
-      .pipe socket
-      .pipe decodeStream
-      .on 'data', messageHandle 
+    
+    socket.setTimeout 5000
+      .on 'error', (e) => 
+        log "connect to #{peer_addr}:#{peer_port} failure due to", e.message
+        callback null
       
-      log "gossip with", peer_addr, peer_port
-      encodeStream.write @scuttlebutt.yieldDigest()
-      # ms.send @scuttlebutt.yieldDigest()
+      .on 'timeout', =>
+        log "#{peer_addr}:#{peer_port} timeout"
+        socket.end()
+        callback null
+      
+      .on 'connect', =>
+        decodeStream = msgpack.createDecodeStream()
+        encodeStream = msgpack.createEncodeStream()
+        onData = @_onData.bind this, {ms: encodeStream, callback}
+        
+        encodeStream
+        .pipe socket
+        .pipe decodeStream
+        .on 'data', onData 
+        
+        # log "gossip with", peer_addr, peer_port
+        encodeStream.write @scuttlebutt.yieldDigest()
 
-  onMsg: (opt, msg) =>
-    {ms} = opt
-    switch msg.type
+  _onData: (opt, msg) =>
+    {ms, callback} = opt
+    {type, digest, deltas, receipt} = msg
+    
+    switch type
       when 'pull_digest'
-        @emit '_digest', ms, msg.digest
+        @emit '_digest', ms, digest
       when 'pull_deltas'
-        @emit '_deltas', ms, msg.deltas, msg.digest, opt.callback
+        @emit '_deltas', ms, deltas, receipt, callback
       when 'push_deltas'
-        @emit '_push_deltas', ms, msg.deltas
-      when 'delete'
-        @emit '_delete', ms, msg.key
+        @emit '_push_deltas', ms, deltas
+      # when 'delete'
+      #   @emit '_delete', ms, msg.key
       else
-        console.error 'unexpected pack'
+        log 'unknown gossip packet'
 
   initHandlers: ->
     @on '_digest', (ms, digest) ->      
       ms.write @scuttlebutt.yieldPullDeltas digest
 
-    @on '_deltas', (ms, deltas, digest, done) ->
+    @on '_deltas', (ms, deltas, receipt, done) ->
       # update new k-v in state
-      [new_peers, updates] = @scuttlebutt.updateDeltas deltas
-      @alive.push new_peers...
-      # send push deltas request
-      ms.write @scuttlebutt.yieldPushDeltas digest
-      ms.end()
-
+      [new_peers, updates] = @scuttlebutt.applyUpdate deltas
+      @active.push new_peers...
+      
       setImmediate =>
-        @emit 'new_peers', new_peers if new_peers.length
+        @emit 'peers_discover', new_peers if new_peers.length
         @emit 'updates', updates if updates.length
 
+      ms.write @scuttlebutt.yieldPushDeltas receipt
+      ms.end()
+      
       done null
 
     @on '_push_deltas', (ms, deltas) ->
       # update new k-v in state
-      [new_peers, updates] = @scuttlebutt.updateDeltas deltas
-      @alive.push new_peers...
-      # console.log new_peers
+      [new_peers, updates] = @scuttlebutt.applyUpdate deltas
+      @active.push new_peers...
+      
       setImmediate =>
-        @emit 'new_peers', new_peers if new_peers.length
+        @emit 'peers_discover', new_peers if new_peers.length
         @emit 'updates', updates if updates.length
 
     # TODO: spread delete command

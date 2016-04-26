@@ -24,7 +24,7 @@ class ScuttleButt extends EventEmitter
 
   yieldPullDeltas: (digest) ->
     # console.log "gossipee receive Digest:", digest 
-    new_digest = {}
+    receipt = {}
     deltas = []
     defaultVersion = @state.defaultVersion()
     for id, version of digest
@@ -33,27 +33,27 @@ class ScuttleButt extends EventEmitter
           if version < @state.max_version
             deltas.push (@_yieldUpdate version, @state)...
         when not @peers[id]?
-          new_digest[id] = defaultVersion
+          receipt[id] = defaultVersion
         when @peers[id].state.max_version > version
           deltas.push (@_yieldUpdate version, @peers[id].state)...
         when @peers[id].state.max_version < version
-          new_digest[id] = @peers[id].state.max_version
+          receipt[id] = @peers[id].state.max_version
     
     delete digest[@state.id]
     for id, peer of @peers when id not of digest
       deltas.push (@_yieldUpdate defaultVersion, @peers[id].state)...
     
     # console.log "gossipee yield Deltas:", deltas
-    # console.log "gossipee yield New Digest:", new_digest
+    # console.log "gossipee yield New Digest:", receipt
 
-    {type: 'pull_deltas', deltas, digest: new_digest}
+    {type: 'pull_deltas', deltas, receipt}
 
-  yieldPushDeltas: (digest) ->
-    # console.log "gossiper receive Digest:", digest
-    # delete digest[@state.id]
+  yieldPushDeltas: (receipt) ->
+    # console.log "gossiper receive Receipt:", receipt
+    # delete receipt[@state.id]
     
     deltas = []
-    for id, version of digest
+    for id, version of receipt
       deltas.push (@_yieldUpdate version, @peers[id]?.state ? @state)...
     
     # console.log "gossiper yield Deltas:", deltas
@@ -63,22 +63,22 @@ class ScuttleButt extends EventEmitter
     ([state.id, k, v, n] for k, [v, n] of state.data when n > version)
     .sort ([..., n_a], [..., n_b]) -> n_a - n_b
 
-  updateDeltas: (deltas) ->
+  applyUpdate: (deltas) ->
     updates = []
     new_peers = for [id, k, v, n] in deltas
       existed = yes
       unless @peers[id]?
         existed = no
         @peers[id] = new Peer {id}
-      
-      if k is '__heartbeat'
-        @peers[id].__heartbeat = v
-        @peers[id].accural util.curr_ts()
         
       if n > @peers[id].state.getn k
         @peers[id].state.set k, v, n
-        updates.push [id, k, v, n]
-        
+        if k is '__heartbeat'
+          @peers[id].__heartbeat = v
+          @peers[id].accural util.curr_ts()
+        else
+          updates.push [id, k, v, n]
+
       if existed then continue else id
       
     [new_peers, updates]

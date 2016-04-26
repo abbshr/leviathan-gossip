@@ -1,6 +1,6 @@
 {
   "name": "leviathan-gossip",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "gossip implement",
   "main": "index.coffee",
   "scripts": {

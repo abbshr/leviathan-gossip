@@ -3,7 +3,7 @@ util = require 'archangel-util'
 
 class FailureDetector
 
-  constructor: ({@last_contact_ts = util.curr_ts(), @threshold = 2, @val_max_len = 100} = {}) ->
+  constructor: ({@last_contact_ts = util.curr_ts(), @phi_threshold = 6, @val_max_len = 100} = {}) ->
     @val = []
 
   accural: (curr_ts) ->
@@ -22,6 +22,6 @@ class FailureDetector
     
     # phi calculate method learn from cassandra...
     phi = -Math.log10 p_later 
-    phi <= @threshold
+    phi <= @phi_threshold
 
 module.exports = FailureDetector

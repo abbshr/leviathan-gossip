@@ -8,10 +8,10 @@ FailureDetector = require './detect'
 #   required: id
 class Peer
 
-  constructor: ({@id, @state} = {}) ->
+  constructor: ({@id, @state, opt = {}} = {}) ->
     @state = new State {@id} unless @state?
     
-    @detector = new FailureDetector()
+    @detector = new FailureDetector opt
     @isActive = yes
     @__heartbeat = 0
 

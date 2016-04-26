@@ -24,8 +24,11 @@ class Gossip extends EventEmitter
   # @gossip_val:
   # @heartbeat_val:
   # @health_check_val:
+  # @phi_threshold:
+  # @val_max_len:
   # @reduce_val:
-  constructor: ({@addr, @port, @alias, @seeds, @gossip_val, @health_check_val, @heartbeat_val, @reduce_val} = {}) ->
+  constructor: (args = {}) ->
+    {@addr, @port, @alias, @seeds, @gossip_val, @health_check_val, @heartbeat_val, @phi_threshold, @val_max_len} = args
     assert.notEqual @seeds.length, 0
     assert.ok @gossip_val >= 1000
     assert.ok @health_check_val >= 1000
@@ -35,11 +38,12 @@ class Gossip extends EventEmitter
     @active = []
     @peers = {}
     @state = new State {@id}
-    @scuttlebutt = new ScuttleButt @state, @peers
+    @opt = {@phi_threshold, @val_max_len}
+    @scuttlebutt = new ScuttleButt @state, @peers, @opt
     @__heartbeat = 0
     super()
 
-  run: ->
+  run: (callback = ->) ->
     @initSeeds()
     @initPeers()
     @initHandlers()
@@ -47,6 +51,7 @@ class Gossip extends EventEmitter
     @heartbeat()
     @polling()
     @monitor()
+    callback()
     # @reduce()
     
   initSeeds: ->
@@ -55,7 +60,7 @@ class Gossip extends EventEmitter
 
   initPeers: ->
     new_peers = for id in @seeds
-      @peers[id] = new Peer {id}
+      @peers[id] = new Peer {id, @opt}
       id
     
     setImmediate =>

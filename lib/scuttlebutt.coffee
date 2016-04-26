@@ -4,7 +4,7 @@ Peer = require './peer'
 
 class ScuttleButt extends EventEmitter
 
-  constructor: (state, peers) ->
+  constructor: (state, peers, @opt = {}) ->
     @state = state
     @peers = peers
 
@@ -56,7 +56,7 @@ class ScuttleButt extends EventEmitter
       existed = yes
       unless @peers[id]?
         existed = no
-        @peers[id] = new Peer {id}
+        @peers[id] = new Peer {id, @opt}
         
       if n > @peers[id].state.getn k
         @peers[id].state.set k, v, n

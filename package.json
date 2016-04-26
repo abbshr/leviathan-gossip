@@ -1,6 +1,6 @@
 {
   "name": "leviathan-gossip",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "gossip implement",
   "main": "index.coffee",
   "scripts": {
@@ -11,7 +11,6 @@
   "dependencies": {
     "archangel-util": "^1.0.0",
     "async": "^2.0.0-rc.2",
-    "msgpack": "^1.0.2",
-    "msgpack-lite": "^0.1.17"
+    "leviathan-msgpack-lite": "github:abbshr/leviathan-msgpack-lite"
   }
 }

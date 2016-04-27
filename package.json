@@ -11,6 +11,7 @@
   "dependencies": {
     "archangel-util": "^1.0.0",
     "async": "^2.0.0-rc.2",
+    "cbor": "^1.0.3",
     "leviathan-msgpack-lite": "github:abbshr/leviathan-msgpack-lite",
     "winston": "^2.2.0"
   }

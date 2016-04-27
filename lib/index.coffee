@@ -4,6 +4,7 @@ assert = require 'assert'
 
 util = require 'archangel-util'
 {log} = require 'util'
+cbor = require 'cbor'
 msgpack = require 'msgpack-lite'
 async = require 'async'
 
@@ -72,14 +73,15 @@ class Gossip extends EventEmitter
 
   serve: ->
     @server = net.createServer (socket) =>
-      decodeStream = msgpack.createDecodeStream()
-      encodeStream = msgpack.createEncodeStream()
+      ds = new cbor.Decoder()
+      es = new cbor.Encoder()
+      # decodeStream = msgpack.createDecodeStream()
+      # encodeStream = msgpack.createEncodeStream()
       
-      onData = @_onData.bind this, {ms: encodeStream}
+      onData = @_onData.bind this, {es}
       
-      encodeStream
-      .pipe socket
-      .pipe decodeStream
+      es.pipe socket
+      .pipe ds
       .on 'data', onData
       
       socket.on 'error', (e) -> log e
@@ -175,39 +177,38 @@ class Gossip extends EventEmitter
         callback null
       
       .on 'connect', =>
-        decodeStream = msgpack.createDecodeStream()
-        encodeStream = msgpack.createEncodeStream()
-        onData = @_onData.bind this, {ms: encodeStream, callback}
+        ds = new cbor.Decoder()
+        es = new cbor.Encoder()
+        onData = @_onData.bind this, {es, callback}
         
-        encodeStream
-        .pipe socket
-        .pipe decodeStream
+        es.pipe socket
+        .pipe ds
         .on 'data', onData 
         
         # log "gossip with", peer_addr, peer_port
-        encodeStream.write @scuttlebutt.yieldDigest()
+        es.write @scuttlebutt.yieldDigest()
 
   _onData: (opt, msg) =>
-    {ms, callback} = opt
+    {es, callback} = opt
     {type, digest, deltas, receipt} = msg
     
     switch type
       when 'pull_digest'
-        @emit '_digest', ms, digest
+        @emit '_digest', es, digest
       when 'pull_deltas'
-        @emit '_deltas', ms, deltas, receipt, callback
+        @emit '_deltas', es, deltas, receipt, callback
       when 'push_deltas'
-        @emit '_push_deltas', ms, deltas
+        @emit '_push_deltas', deltas
       # when 'delete'
-      #   @emit '_delete', ms, msg.key
+      #   @emit '_delete', es, msg.key
       else
         log 'unknown gossip packet'
 
   initHandlers: ->
-    @on '_digest', (ms, digest) ->      
-      ms.write @scuttlebutt.yieldPullDeltas digest
+    @on '_digest', (es, digest) ->      
+      es.write @scuttlebutt.yieldPullDeltas digest
 
-    @on '_deltas', (ms, deltas, receipt, done) ->
+    @on '_deltas', (es, deltas, receipt, done) ->
       # update new k-v in state
       [new_peers, updates] = @scuttlebutt.applyUpdate deltas
       @active.push new_peers...
@@ -216,12 +217,10 @@ class Gossip extends EventEmitter
         @emit 'peers_discover', new_peers if new_peers.length
         @emit 'updates', updates if updates.length
 
-      ms.write @scuttlebutt.yieldPushDeltas receipt
-      ms.end()
-      
+      es.end @scuttlebutt.yieldPushDeltas receipt
       done null
 
-    @on '_push_deltas', (ms, deltas) ->
+    @on '_push_deltas', (deltas) ->
       # update new k-v in state
       [new_peers, updates] = @scuttlebutt.applyUpdate deltas
       @active.push new_peers...

@@ -3,7 +3,7 @@ util = require 'archangel-util'
 
 class FailureDetector
 
-  constructor: ({@last_contact_ts = util.curr_ts(), @phi_threshold = 6, @val_max_len = 100} = {}) ->
+  constructor: ({@last_contact_ts = util.curr_ts(), @phi_threshold = 8, @val_max_len = 1000} = {}) ->
     @val = []
 
   accural: (curr_ts) ->

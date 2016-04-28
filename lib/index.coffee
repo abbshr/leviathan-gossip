@@ -230,8 +230,8 @@ class Gossip extends EventEmitter
     # @on '_delete', (ms, key) ->
     #   @state.dels key
 
-  set: (k, v) ->
-    @state.set k, v
+  set: (k, v, n) ->
+    @state.set k, v, n
     
   get: (r, k) ->
     state = if r is @state.id

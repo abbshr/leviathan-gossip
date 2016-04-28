@@ -14,6 +14,7 @@ class State extends EventEmitter
   set: (k, v, n) ->
     @max_version = n ? @max_version + 1
     @data[k] = [v, @max_version]
+    @max_version
 
   get: (k) ->
     @data[k]

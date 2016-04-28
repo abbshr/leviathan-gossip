@@ -3,7 +3,6 @@ assert = require 'assert'
 {EventEmitter} = require 'events'
 
 util = require 'archangel-util'
-{log} = require 'util'
 cbor = require 'cbor'
 msgpack = require 'msgpack-lite'
 async = require 'async'
@@ -11,6 +10,7 @@ async = require 'async'
 ScuttleButt = require './scuttlebutt'
 Peer = require './peer'
 State = require './state'
+logger = require('./logger')()
 
 # coding note: 
 #   peer_info ≌ id ≌ "#{addr}:#{port}"
@@ -57,7 +57,6 @@ class Gossip extends EventEmitter
     
   initSeeds: ->
     util.unorderList.rm @seeds, @id
-    log "init seeds:", @seeds
 
   initPeers: ->
     new_peers = for id in @seeds
@@ -68,8 +67,6 @@ class Gossip extends EventEmitter
       @emit "peers_discover", new_peers if new_peers.length
       
     @active.push new_peers...
-    
-    log "found #{new_peers.length} active peers"
 
   serve: ->
     @server = net.createServer (socket) =>
@@ -84,10 +81,10 @@ class Gossip extends EventEmitter
       .pipe ds
       .on 'data', onData
       
-      socket.on 'error', (e) -> log e
+      socket.on 'error', (e) -> logger.error e
         
     .listen @port, =>
-      log "server start:", @port
+      logger.info "[gossip]", "server start, listen to", @port
 
   heartbeat: ->
     # log "start heartbeat", @__heartbeat, @state.data
@@ -168,11 +165,11 @@ class Gossip extends EventEmitter
     
     socket.setTimeout 5000
       .on 'error', (e) => 
-        log "connect to #{peer_addr}:#{peer_port} failure due to", e.message
+        logger.error "[gossip]", "connect to #{peer_addr}:#{peer_port} failure due to", e.message
         callback null
       
       .on 'timeout', =>
-        log "#{peer_addr}:#{peer_port} timeout"
+        logger.error "[gossip]", "#{peer_addr}:#{peer_port} timeout"
         socket.end()
         callback null
       
@@ -202,7 +199,7 @@ class Gossip extends EventEmitter
       # when 'delete'
       #   @emit '_delete', es, msg.key
       else
-        log 'unknown gossip packet'
+        logger.error '[gossip]', 'unknown gossip packet'
 
   initHandlers: ->
     @on '_digest', (es, digest) ->      

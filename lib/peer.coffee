@@ -13,7 +13,7 @@ class Peer
     
     @detector = new FailureDetector opt
     @isActive = yes
-    @__heartbeat = 0
+    # @__heartbeat = 0
 
   detect: (ts) ->
     @detector.detect ts

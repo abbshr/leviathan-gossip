@@ -41,7 +41,7 @@ class Gossip extends EventEmitter
     @state = new State {@id}
     @opt = {@phi_threshold, @val_max_len}
     @scuttlebutt = new ScuttleButt @state, @peers, @opt
-    @__heartbeat = 0
+    # @__heartbeat = 0
     super()
 
   run: (callback = ->) ->
@@ -88,7 +88,7 @@ class Gossip extends EventEmitter
 
   heartbeat: ->
     # log "start heartbeat", @__heartbeat, @state.data
-    @state.set "__heartbeat", ++@__heartbeat
+    @state.set "__heartbeat", 1
     setTimeout =>
       @heartbeat()
     , @heartbeat_val
@@ -150,16 +150,18 @@ class Gossip extends EventEmitter
     
     # log "peers to gossip with:", queue
     return callback() if queue.length is 0
-
+    # console.log queue, @active, @suspend
     queue = for id in queue
       [addr, port] = id.split ':'
-      (cb) => @gossip addr, port, cb
+      do (addr, port) =>
+        (cb) => @gossip addr, port, cb
 
     # TODO: consider if there is need to wait the longest request
     async.parallel queue, (err, done) ->
       callback()
 
   gossip: (peer_addr, peer_port, callback) =>
+    # console.log peer_addr, peer_port
     # TODO: client events handle configuration
     socket = net.connect peer_port, peer_addr
     
@@ -187,11 +189,11 @@ class Gossip extends EventEmitter
 
   _onData: (opt, msg) =>
     {es, callback} = opt
-    {type, digest, deltas, receipt} = msg
+    {id, type, digest, deltas, receipt} = msg
     
     switch type
       when 'pull_digest'
-        @emit '_digest', es, digest
+        @emit '_digest', es, id, digest
       when 'pull_deltas'
         @emit '_deltas', es, deltas, receipt, callback
       when 'push_deltas'
@@ -202,14 +204,16 @@ class Gossip extends EventEmitter
         logger.error '[gossip]', 'unknown gossip packet'
 
   initHandlers: ->
-    @on '_digest', (es, digest) ->      
-      es.write @scuttlebutt.yieldPullDeltas digest
+    @on '_digest', (es, remote_id, digest) ->      
+      es.write @scuttlebutt.yieldPullDeltas remote_id, digest
 
     @on '_deltas', (es, deltas, receipt, done) ->
       # update new k-v in state
+      # console.log 'gossiper receive deltas:', deltas
+      # console.log 'gossiper receive receipt:', receipt
       [new_peers, updates] = @scuttlebutt.applyUpdate deltas
       @active.push new_peers...
-      
+
       setImmediate =>
         @emit 'peers_discover', new_peers if new_peers.length
         @emit 'updates', updates if updates.length
@@ -219,9 +223,10 @@ class Gossip extends EventEmitter
 
     @on '_push_deltas', (deltas) ->
       # update new k-v in state
+      # console.log 'gossipee receive deltas:', deltas
       [new_peers, updates] = @scuttlebutt.applyUpdate deltas
       @active.push new_peers...
-      
+
       setImmediate =>
         @emit 'peers_discover', new_peers if new_peers.length
         @emit 'updates', updates if updates.length
@@ -232,21 +237,21 @@ class Gossip extends EventEmitter
 
   set: (k, v, n) ->
     @state.set k, v, n
-    
+
   get: (r, k) ->
     state = if r is @state.id
       @state
     else
       @peers[r]?.state
     state?.getv k
-    
+
   getn: (r, k) ->
     state = if r is @state.id
       @state
     else
       @peers[r]?.state
     state?.getn k
-    
+
   # TODO: spread delete command
   # del: (k) ->
   #   @state.dels k

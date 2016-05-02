@@ -12,8 +12,9 @@ class State extends EventEmitter
   defaultVersion: -> 0
   
   set: (k, v, n) ->
-    @max_version = n ? @max_version + 1
-    @data[k] = [v, @max_version]
+    version = n ? @max_version + 1
+    @max_version = if n > @max_version then n else @max_version + 1
+    @data[k] = [v, version]
     @max_version
 
   get: (k) ->
